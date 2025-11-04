@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주차 차량 관리</title>
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+    }
+    #car-list {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+    .car {
+      width: 120px;
+      height: 80px;
+      line-height: 80px;
+      border: 2px solid #000;
+      margin: 10px;
+      border-radius: 10px;
+      background: white;
+      font-size: 20px;
+      font-weight: bold;
+      color: black;
+    }
+    .car.red {
+      background: #ffcccc;
+    }
+    .car.green {
+      background: #ccffcc;
+    }
+    #input-area {
+      margin-top: 30px;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      width: 120px;
+      text-align: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+    }
+    #message {
+      margin-top: 15px;
+      font-weight: bold;
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>🚗 주차 차량 관리 대시보드</h1>
+
+  <div id="car-list"></div>
+
+  <div id="input-area">
+    <input id="carInput" type="text" maxlength="4" placeholder="차량번호" />
+    <button id="confirmBtn">확인</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    const socket = io("https://parking-server-6uo8.onrender.com");
+    const carList = document.getElementById("car-list");
+    const input = document.getElementById("carInput");
+    const btn = document.getElementById("confirmBtn");
+    const message = document.getElementById("message");
+    let cars = [];
+
+    socket.on("update", (data) => {
+      cars = JSON.parse(data);
+      renderCars();
+    });
+
+    function renderCars() {
+      carList.innerHTML = "";
+      cars.forEach((car) => {
+        const div = document.createElement("div");
+        div.classList.add("car");
+        if (car.status === "parked") div.classList.add("red");
+        if (car.status === "confirmed") div.classList.add("green");
+        div.textContent = car.number;
+        carList.appendChild(div);
+      });
+    }
+
+    btn.addEventListener("click", async () => {
+      const num = input.value.trim();
+      if (num.length !== 4) {
+        message.textContent = "4자리 차량번호를 입력하세요.";
+        return;
+      }
+      message.textContent = "";
+      try {
+        const res = await fetch("https://parking-server-6uo8.onrender.com/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ number: num }),
+        });
+
+        if (res.status === 404) {
+          message.textContent = "🚫 등록된 차량이 없습니다.";
+        } else {
+          message.textContent = "✅ 확인 완료!";
+        }
+      } catch (e) {
+        console.error(e);
+        message.textContent = "서버 연결 오류!";
+      }
+      input.value = "";
+    });
+  </script>
+</body>
+</html>
