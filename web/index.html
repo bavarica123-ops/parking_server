@@ -1,126 +1,112 @@
 <!DOCTYPE html>
 <html lang="ko">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>주차 차량 관리</title>
-  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      text-align: center;
-      padding: 20px;
-    }
-    h1 {
-      color: #333;
-    }
-    #car-list {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-    .car {
-      width: 120px;
-      height: 80px;
-      line-height: 80px;
-      border: 2px solid #000;
-      margin: 10px;
-      border-radius: 10px;
-      background: white;
-      font-size: 20px;
-      font-weight: bold;
-      color: black;
-    }
-    .car.red {
-      background: #ffcccc;
-    }
-    .car.green {
-      background: #ccffcc;
-    }
-    #input-area {
-      margin-top: 30px;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-      width: 120px;
-      text-align: center;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin-left: 10px;
-    }
-    #message {
-      margin-top: 15px;
-      font-weight: bold;
-      color: red;
-    }
-  </style>
-</head>
-<body>
-  <h1>🚗 주차 차량 관리 대시보드</h1>
-
-  <div id="car-list"></div>
-
-  <div id="input-area">
-    <input id="carInput" type="text" maxlength="4" placeholder="차량번호" />
-    <button id="confirmBtn">확인</button>
-    <div id="message"></div>
-  </div>
-
-  <script>
-    const socket = io("https://parking-server-6uo8.onrender.com");
-    const carList = document.getElementById("car-list");
-    const input = document.getElementById("carInput");
-    const btn = document.getElementById("confirmBtn");
-    const message = document.getElementById("message");
-    let cars = [];
-
-    socket.on("update", (data) => {
-      cars = JSON.parse(data);
-      renderCars();
-    });
-
-    function renderCars() {
-      carList.innerHTML = "";
-      cars.forEach((car) => {
-        const div = document.createElement("div");
-        div.classList.add("car");
-        if (car.status === "parked") div.classList.add("red");
-        if (car.status === "confirmed") div.classList.add("green");
-        div.textContent = car.number;
-        carList.appendChild(div);
-      });
-    }
-
-    btn.addEventListener("click", async () => {
-      const num = input.value.trim();
-      if (num.length !== 4) {
-        message.textContent = "4자리 차량번호를 입력하세요.";
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <title>주차 차량 관리</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 40px;
       }
-      message.textContent = "";
-      try {
-        const res = await fetch("https://parking-server-6uo8.onrender.com/confirm", {
+      h1 {
+        margin-bottom: 20px;
+      }
+      input {
+        padding: 8px;
+        font-size: 16px;
+      }
+      button {
+        padding: 8px 16px;
+        margin-left: 8px;
+        cursor: pointer;
+      }
+      table {
+        margin: 20px auto;
+        border-collapse: collapse;
+        width: 60%;
+      }
+      th, td {
+        border: 1px solid #333;
+        padding: 10px;
+      }
+      .confirmed {
+        background-color: #90ee90; /* 초록색 */
+      }
+      .unconfirmed {
+        background-color: #ffb3b3; /* 빨간색 */
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚗 등록된 차량 목록</h1>
+
+    <div>
+      <input id="carNumber" type="text" maxlength="4" placeholder="번호 입력 (뒤 4자리)" />
+      <button onclick="confirmCar()">확인</button>
+    </div>
+
+    <p id="message" style="color: red; font-weight: bold;"></p>
+
+    <table id="carTable">
+      <thead>
+        <tr>
+          <th>차량번호</th>
+          <th>시간</th>
+          <th>상태</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      const socket = io("https://parking-server-6uo8.onrender.com");
+      const carTableBody = document.querySelector("#carTable tbody");
+      const message = document.getElementById("message");
+
+      function updateTable(data) {
+        carTableBody.innerHTML = "";
+        data.forEach((car) => {
+          const row = document.createElement("tr");
+          row.className = car.confirmed ? "confirmed" : "unconfirmed";
+          row.innerHTML = `
+            <td>${car.number}</td>
+            <td>${car.time ? new Date(car.time).toLocaleTimeString() : "-"}</td>
+            <td>${car.confirmed ? "확인됨" : "미확인"}</td>
+          `;
+          carTableBody.appendChild(row);
+        });
+      }
+
+      socket.on("update", (data) => {
+        console.log("📡 업데이트 수신:", data);
+        updateTable(data);
+      });
+
+      function confirmCar() {
+        const num = document.getElementById("carNumber").value.trim();
+        if (!num) return;
+
+        fetch("https://parking-server-6uo8.onrender.com/confirm", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ number: num }),
-        });
+        })
+          .then((res) => {
+            if (res.ok) {
+              message.textContent = "";
+            } else {
+              message.textContent = "등록된 번호가 없습니다.";
+            }
+          })
+          .catch((err) => {
+            console.error(err);
+            message.textContent = "서버 오류 발생.";
+          });
 
-        if (res.status === 404) {
-          message.textContent = "🚫 등록된 차량이 없습니다.";
-        } else {
-          message.textContent = "✅ 확인 완료!";
-        }
-      } catch (e) {
-        console.error(e);
-        message.textContent = "서버 연결 오류!";
+        document.getElementById("carNumber").value = "";
       }
-      input.value = "";
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
