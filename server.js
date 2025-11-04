@@ -7,9 +7,7 @@ const path = require("path");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-  },
+  cors: { origin: "*" },
 });
 
 app.use(cors());
@@ -22,18 +20,16 @@ app.post("/park", (req, res) => {
   const { number, time } = req.body;
   console.log(`🚗 등록됨: ${number}`);
 
-  // 기존에 있던 번호 제거 후 추가
   parkedCars = parkedCars.filter((c) => c.number !== number);
   parkedCars.push({ number, time, confirmed: false });
 
-  io.emit("update", parkedCars); // 모든 클라이언트에 실시간 전송
+  io.emit("update", parkedCars);
   res.sendStatus(200);
 });
 
 app.post("/confirm", (req, res) => {
   const { number } = req.body;
   const car = parkedCars.find((c) => c.number === number);
-
   if (car) {
     car.confirmed = true;
     console.log(`✅ 확인됨: ${number}`);
@@ -60,9 +56,7 @@ io.on("connection", (socket) => {
   console.log("📡 연결됨:", socket.id);
   socket.emit("update", parkedCars);
 
-  socket.on("disconnect", () => {
-    console.log("❌ 연결 해제:", socket.id);
-  });
+  socket.on("disconnect", () => console.log("❌ 연결 해제:", socket.id));
 });
 
 const PORT = process.env.PORT || 3000;
