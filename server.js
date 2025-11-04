@@ -1,63 +1,75 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const cors = require("cors");
-const path = require("path");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import bodyParser from "body-parser";
+import cors from "cors";
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: "*",
+  },
 });
 
 app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "web")));
+app.use(bodyParser.json());
+app.use(express.static("web"));
 
-let parkedCars = []; // { number, time, confirmed }
+// ✅ 고정된 3칸 주차 상태 관리
+let parkedSpots = [
+  { index: 0, number: "", time: "", confirmed: false },
+  { index: 1, number: "", time: "", confirmed: false },
+  { index: 2, number: "", time: "", confirmed: false },
+];
 
+// 🚗 차량 등록 (index 포함)
 app.post("/park", (req, res) => {
-  const { number, time } = req.body;
-  console.log(`🚗 등록됨: ${number}`);
+  const { number, time, index } = req.body;
+  if (index < 0 || index > 2) return res.status(400).send("잘못된 인덱스");
 
-  parkedCars = parkedCars.filter((c) => c.number !== number);
-  parkedCars.push({ number, time, confirmed: false });
-
-  io.emit("update", parkedCars);
+  parkedSpots[index] = { index, number, time, confirmed: false };
+  io.emit("update", parkedSpots);
+  console.log(`✅ 차량 등록: ${number} (${index + 1}번 칸)`);
   res.sendStatus(200);
 });
 
+// 🗑️ 차량 삭제
+app.post("/remove", (req, res) => {
+  const { index } = req.body;
+  if (index < 0 || index > 2) return res.status(400).send("잘못된 인덱스");
+
+  parkedSpots[index] = { index, number: "", time: "", confirmed: false };
+  io.emit("update", parkedSpots);
+  console.log(`🗑️ ${index + 1}번 칸 비워짐`);
+  res.sendStatus(200);
+});
+
+// ✅ 차량 확인 (웹에서 입력 시)
 app.post("/confirm", (req, res) => {
   const { number } = req.body;
-  const car = parkedCars.find((c) => c.number === number);
-  if (car) {
-    car.confirmed = true;
-    console.log(`✅ 확인됨: ${number}`);
-    io.emit("update", parkedCars);
+  const spot = parkedSpots.find((s) => s.number === number);
+  if (spot) {
+    spot.confirmed = true;
+    io.emit("update", parkedSpots);
+    console.log(`💚 차량 확인 완료: ${number}`);
     res.sendStatus(200);
   } else {
-    res.status(404).send("등록된 번호가 없습니다.");
+    res.status(404).send("등록된 차량이 없습니다.");
   }
 });
 
-app.post("/remove", (req, res) => {
-  const { number } = req.body;
-  parkedCars = parkedCars.filter((c) => c.number !== number);
-  console.log(`🗑️ 삭제됨: ${number}`);
-  io.emit("update", parkedCars);
-  res.sendStatus(200);
-});
-
+// 🧾 현재 상태 불러오기
 app.get("/parked", (req, res) => {
-  res.json(parkedCars);
+  res.json(parkedSpots);
 });
 
-io.on("connection", (socket) => {
-  console.log("📡 연결됨:", socket.id);
-  socket.emit("update", parkedCars);
-
-  socket.on("disconnect", () => console.log("❌ 연결 해제:", socket.id));
+// 🌐 웹 페이지
+app.get("/", (req, res) => {
+  res.sendFile(process.cwd() + "/web/index.html");
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🚀 서버 실행 중: http://localhost:${PORT}`);
+});
